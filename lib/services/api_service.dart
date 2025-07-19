@@ -28,7 +28,7 @@ class ApiService {
           if (_authToken != null) {
             options.headers['Authorization'] = 'Bearer $_authToken';
           }
-          
+
           print('🌐 API Request: ${options.method} ${options.path}');
           handler.next(options);
         },
@@ -56,12 +56,12 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = response.data;
         _authToken = data['token'];
-        
+
         // Save token to shared preferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', _authToken!);
         await prefs.setString('user_data', data['user'].toString());
-        
+
         return data;
       } else {
         throw Exception('Login failed');
@@ -94,7 +94,7 @@ class ApiService {
   Future<List<InventoryTransfer>> getInventoryTransfers() async {
     try {
       final response = await _dio.get('/api/inventory_transfers');
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data['transfers'] ?? response.data;
         return data.map((json) => InventoryTransfer.fromJson(json)).toList();
@@ -109,7 +109,7 @@ class ApiService {
   Future<InventoryTransfer> getInventoryTransfer(int id) async {
     try {
       final response = await _dio.get('/api/inventory_transfers/$id');
-      
+
       if (response.statusCode == 200) {
         return InventoryTransfer.fromJson(response.data);
       } else {
@@ -123,7 +123,7 @@ class ApiService {
   Future<InventoryTransfer> createInventoryTransfer(Map<String, dynamic> data) async {
     try {
       final response = await _dio.post('/api/inventory_transfers', data: data);
-      
+
       if (response.statusCode == 201) {
         return InventoryTransfer.fromJson(response.data);
       } else {
@@ -137,7 +137,7 @@ class ApiService {
   Future<InventoryTransfer> updateInventoryTransfer(int id, Map<String, dynamic> data) async {
     try {
       final response = await _dio.put('/api/inventory_transfers/$id', data: data);
-      
+
       if (response.statusCode == 200) {
         return InventoryTransfer.fromJson(response.data);
       } else {
@@ -151,7 +151,7 @@ class ApiService {
   Future<Map<String, dynamic>> submitTransferForQC(int id) async {
     try {
       final response = await _dio.post('/api/inventory_transfers/$id/submit');
-      
+
       if (response.statusCode == 200) {
         return response.data;
       } else {
@@ -165,7 +165,7 @@ class ApiService {
   Future<Map<String, dynamic>> reopenTransfer(int id) async {
     try {
       final response = await _dio.post('/api/inventory_transfers/$id/reopen');
-      
+
       if (response.statusCode == 200) {
         return response.data;
       } else {
@@ -180,7 +180,7 @@ class ApiService {
   Future<List<GRPODocument>> getGRPODocuments() async {
     try {
       final response = await _dio.get('/api/grpo_documents');
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data['grpos'] ?? response.data;
         return data.map((json) => GRPODocument.fromJson(json)).toList();
@@ -195,7 +195,7 @@ class ApiService {
   Future<GRPODocument> getGRPODocument(int id) async {
     try {
       final response = await _dio.get('/api/grpo_documents/$id');
-      
+
       if (response.statusCode == 200) {
         return GRPODocument.fromJson(response.data);
       } else {
@@ -209,7 +209,7 @@ class ApiService {
   Future<GRPODocument> createGRPODocument(Map<String, dynamic> data) async {
     try {
       final response = await _dio.post('/api/grpo_documents', data: data);
-      
+
       if (response.statusCode == 201) {
         return GRPODocument.fromJson(response.data);
       } else {
@@ -226,7 +226,7 @@ class ApiService {
       final response = await _dio.post('/api/validate_barcode', data: {
         'barcode': barcode,
       });
-      
+
       if (response.statusCode == 200) {
         return response.data;
       } else {
@@ -243,7 +243,7 @@ class ApiService {
       final response = await _dio.post('/api/validate_transfer_request', data: {
         'request_number': requestNumber,
       });
-      
+
       if (response.statusCode == 200) {
         return response.data;
       } else {
@@ -260,7 +260,7 @@ class ApiService {
       final response = await _dio.post('/api/inventory_transfers/$id/qc_approve', data: {
         'qc_notes': notes ?? '',
       });
-      
+
       if (response.statusCode == 200) {
         return response.data;
       } else {
@@ -276,7 +276,7 @@ class ApiService {
       final response = await _dio.post('/api/inventory_transfers/$id/qc_reject', data: {
         'qc_notes': reason,
       });
-      
+
       if (response.statusCode == 200) {
         return response.data;
       } else {
@@ -295,5 +295,86 @@ class ApiService {
     } catch (e) {
       return false;
     }
+  }
+
+  Future<List<Map<String, dynamic>>> validateBarcode(String barcode) async {
+    final response = await _dio.post('/validate_barcode', data: {
+      'barcode': barcode,
+    });
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  // Pick List APIs
+  Future<List<PickList>> getPickLists({String status = 'assigned'}) async {
+    final response = await _dio.get('/pick_lists', queryParameters: {
+      'status': status,
+    });
+    return (response.data as List)
+        .map((json) => PickList.fromJson(json))
+        .toList();
+  }
+
+  Future<void> submitPickList(PickList pickList) async {
+    await _dio.post('/pick_lists/${pickList.id}/submit', data: pickList.toJson());
+  }
+
+  // Inventory Count APIs
+  Future<List<InventoryCountTask>> getInventoryCountTasks() async {
+    final response = await _dio.get('/inventory_count_tasks');
+    return (response.data as List)
+        .map((json) => InventoryCountTask.fromJson(json))
+        .toList();
+  }
+
+  Future<void> submitInventoryCount(String taskId, List<CountedItem> items) async {
+    await _dio.post('/inventory_count_tasks/$taskId/submit', data: {
+      'items': items.map((item) => item.toJson()).toList(),
+    });
+  }
+
+  // Bin Scanner APIs
+  Future<List<BinItem>> getBinItems(String binCode) async {
+    final response = await _dio.get('/bins/$binCode/items');
+    return (response.data as List)
+        .map((json) => BinItem.fromJson(json))
+        .toList();
+  }
+
+  // Label Printing APIs
+  Future<List<LabelTemplate>> getLabelTemplates() async {
+    final response = await _dio.get('/label_templates');
+    return (response.data as List)
+        .map((json) => LabelTemplate.fromJson(json))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> getItemDetails(String itemCode) async {
+    final response = await _dio.get('/items/$itemCode');
+    return response.data;
+  }
+
+  Future<void> printLabel({
+    required String templateId,
+    required String itemCode,
+    required int quantity,
+    required Map<String, dynamic> itemDetails,
+  }) async {
+    await _dio.post('/print_label', data: {
+      'template_id': templateId,
+      'item_code': itemCode,
+      'quantity': quantity,
+      'item_details': itemDetails,
+    });
+  }
+
+  Future<List<PrintHistory>> getPrintHistory() async {
+    final response = await _dio.get('/print_history');
+    return (response.data as List)
+        .map((json) => PrintHistory.fromJson(json))
+        .toList();
+  }
+
+  Future<void> reprintLabel(String historyId) async {
+    await _dio.post('/print_history/$historyId/reprint');
   }
 }

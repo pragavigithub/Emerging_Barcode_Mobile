@@ -1,16 +1,25 @@
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+enum ScanType {
+  item,
+  bin,
+  po,
+  pickList,
+  transfer,
+  general,
+}
 
 class BarcodeScannerScreen extends StatefulWidget {
   final String title;
-  final String hint;
-  final Function(String) onBarcodeDetected;
-
+  final ScanType scanType;
+  
   const BarcodeScannerScreen({
     Key? key,
-    required this.title,
-    required this.hint,
-    required this.onBarcodeDetected,
+    this.title = 'Scan Barcode',
+    this.scanType = ScanType.general,
   }) : super(key: key);
 
   @override
@@ -18,40 +27,188 @@ class BarcodeScannerScreen extends StatefulWidget {
 }
 
 class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
-  late MobileScannerController controller;
-  bool isScanning = true;
+  MobileScannerController controller = MobileScannerController();
+  bool _hasPermission = false;
+  bool _isFlashOn = false;
+  bool _isScanning = true;
 
   @override
   void initState() {
     super.initState();
-    controller = MobileScannerController();
+    _requestCameraPermission();
   }
 
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
+  Future<void> _requestCameraPermission() async {
+    final permission = await Permission.camera.request();
+    setState(() {
+      _hasPermission = permission.isGranted;
+    });
   }
 
-  void _handleBarcode(BarcodeCapture capture) {
-    if (!isScanning) return;
-
+  void _onDetect(BarcodeCapture capture) {
+    if (!_isScanning) return;
+    
     final List<Barcode> barcodes = capture.barcodes;
-    if (barcodes.isNotEmpty) {
-      final String? code = barcodes.first.rawValue;
-      if (code != null && code.isNotEmpty) {
+    for (final barcode in barcodes) {
+      if (barcode.rawValue != null) {
         setState(() {
-          isScanning = false;
+          _isScanning = false;
         });
-
-        Navigator.pop(context);
-        widget.onBarcodeDetected(code);
+        
+        // Provide haptic feedback
+        _processBarcode(barcode.rawValue!);
+        break;
       }
+    }
+  }
+
+  void _processBarcode(String value) {
+    // Add validation based on scan type
+    String validatedValue = _validateBarcode(value);
+    
+    if (validatedValue.isNotEmpty) {
+      Navigator.of(context).pop(validatedValue);
+    } else {
+      setState(() {
+        _isScanning = true;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_getInvalidBarcodeMessage()),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  String _validateBarcode(String value) {
+    switch (widget.scanType) {
+      case ScanType.item:
+        // Item codes typically have specific format
+        if (value.length >= 3) return value;
+        break;
+      case ScanType.bin:
+        // Bin codes validation
+        if (value.length >= 2) return value;
+        break;
+      case ScanType.po:
+        // PO number validation
+        if (value.length >= 3) return value;
+        break;
+      case ScanType.pickList:
+        // Pick list validation
+        if (value.contains('PL') || value.length >= 5) return value;
+        break;
+      case ScanType.transfer:
+        // Transfer request validation
+        if (value.contains('TR') || value.length >= 5) return value;
+        break;
+      case ScanType.general:
+        return value;
+    }
+    return '';
+  }
+
+  String _getInvalidBarcodeMessage() {
+    switch (widget.scanType) {
+      case ScanType.item:
+        return 'Invalid item barcode. Please scan a valid item.';
+      case ScanType.bin:
+        return 'Invalid bin code. Please scan a valid bin location.';
+      case ScanType.po:
+        return 'Invalid PO number. Please scan a valid purchase order.';
+      case ScanType.pickList:
+        return 'Invalid pick list code. Please scan a valid pick list.';
+      case ScanType.transfer:
+        return 'Invalid transfer code. Please scan a valid transfer request.';
+      default:
+        return 'Invalid barcode format.';
+    }
+  }
+
+  void _toggleFlash() {
+    setState(() {
+      _isFlashOn = !_isFlashOn;
+    });
+    controller.toggleTorch();
+  }
+
+  void _manualEntry() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final textController = TextEditingController();
+        return AlertDialog(
+          title: Text('Enter ${_getScanTypeLabel()} Manually'),
+          content: TextField(
+            controller: textController,
+            decoration: InputDecoration(
+              labelText: _getScanTypeLabel(),
+              border: const OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final value = textController.text.trim();
+                if (value.isNotEmpty) {
+                  Navigator.pop(context);
+                  _processBarcode(value);
+                }
+              },
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _getScanTypeLabel() {
+    switch (widget.scanType) {
+      case ScanType.item:
+        return 'Item Code';
+      case ScanType.bin:
+        return 'Bin Code';
+      case ScanType.po:
+        return 'PO Number';
+      case ScanType.pickList:
+        return 'Pick List ID';
+      case ScanType.transfer:
+        return 'Transfer ID';
+      default:
+        return 'Code';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasPermission) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.title),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.camera_alt, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text('Camera permission is required'),
+              SizedBox(height: 8),
+              Text('Please grant camera permission to scan barcodes'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -59,44 +216,82 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.flash_on),
-            onPressed: () => controller.toggleTorch(),
+            onPressed: _toggleFlash,
+            icon: Icon(_isFlashOn ? Icons.flash_on : Icons.flash_off),
           ),
           IconButton(
-            icon: const Icon(Icons.flip_camera_ios),
-            onPressed: () => controller.switchCamera(),
+            onPressed: _manualEntry,
+            icon: const Icon(Icons.keyboard),
+            tooltip: 'Manual Entry',
           ),
         ],
       ),
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           MobileScanner(
             controller: controller,
-            onDetect: _handleBarcode,
+            onDetect: _onDetect,
           ),
+          // Scanning overlay
           Container(
             decoration: ShapeDecoration(
-              shape: _ScannerOverlayShape(),
+              shape: QRScannerOverlayShape(
+                borderColor: Theme.of(context).primaryColor,
+                borderRadius: 10,
+                borderLength: 30,
+                borderWidth: 5,
+                cutOutSize: 250,
+              ),
             ),
           ),
+          // Instructions
           Positioned(
             bottom: 100,
             left: 0,
             right: 0,
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                widget.hint,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
-                textAlign: TextAlign.center,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Position the ${_getScanTypeLabel().toLowerCase()} within the frame',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      FloatingActionButton(
+                        onPressed: _toggleFlash,
+                        backgroundColor: Colors.white24,
+                        child: Icon(
+                          _isFlashOn ? Icons.flash_on : Icons.flash_off,
+                          color: Colors.white,
+                        ),
+                      ),
+                      FloatingActionButton(
+                        onPressed: _manualEntry,
+                        backgroundColor: Colors.white24,
+                        child: const Icon(
+                          Icons.keyboard,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -104,114 +299,139 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
 }
 
-class _ScannerOverlayShape extends ShapeBorder {
+class QRScannerOverlayShape extends ShapeBorder {
+  final Color borderColor;
+  final double borderWidth;
+  final Color overlayColor;
+  final double borderRadius;
+  final double borderLength;
+  final double cutOutSize;
+
+  const QRScannerOverlayShape({
+    this.borderColor = Colors.red,
+    this.borderWidth = 3.0,
+    this.overlayColor = const Color.fromRGBO(0, 0, 0, 80),
+    this.borderRadius = 0,
+    this.borderLength = 40,
+    this.cutOutSize = 250,
+  });
+
   @override
-  EdgeInsetsGeometry get dimensions => const EdgeInsets.all(0);
+  EdgeInsetsGeometry get dimensions => const EdgeInsets.all(10);
 
   @override
   Path getInnerPath(Rect rect, {TextDirection? textDirection}) {
-    final double scanAreaSize = rect.width * 0.7;
-    final double left = (rect.width - scanAreaSize) / 2;
-    final double top = (rect.height - scanAreaSize) / 2;
-
     return Path()
-      ..addRect(Rect.fromLTWH(left, top, scanAreaSize, scanAreaSize));
+      ..fillType = PathFillType.evenOdd
+      ..addPath(getOuterPath(rect), Offset.zero);
   }
 
   @override
   Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
-    return Path()..addRect(rect);
+    Path path = Path()..addRect(rect);
+    Path cutOutPath = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: rect.center,
+            width: cutOutSize,
+            height: cutOutSize,
+          ),
+          Radius.circular(borderRadius),
+        ),
+      );
+    return Path.combine(PathOperation.difference, path, cutOutPath);
   }
 
   @override
   void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
-    const double scanAreaSize = 250;
-    final double left = (rect.width - scanAreaSize) / 2;
-    final double top = (rect.height - scanAreaSize) / 2;
+    final width = rect.width;
+    final borderWidthSize = borderWidth;
+    final height = rect.height;
+    final borderOffset = borderWidthSize / 2;
+    final cutOutWidth = cutOutSize + borderWidthSize;
+    final cutOutHeight = cutOutSize + borderWidthSize;
 
-    final Paint backgroundPaint = Paint()
-      ..color = Colors.black54
+    final cutOutRect = Rect.fromLTWH(
+      rect.center.dx - cutOutWidth / 2 + borderOffset,
+      rect.center.dy - cutOutHeight / 2 + borderOffset,
+      cutOutWidth,
+      cutOutHeight,
+    );
+
+    final backgroundPaint = Paint()
+      ..color = overlayColor
       ..style = PaintingStyle.fill;
 
-    final Paint borderPaint = Paint()
-      ..color = Colors.white
+    final borderPaint = Paint()
+      ..color = borderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = borderWidthSize;
 
-    // Draw overlay
-    canvas.drawPath(
-      Path.combine(
-        PathOperation.difference,
-        Path()..addRect(rect),
-        Path()..addRect(Rect.fromLTWH(left, top, scanAreaSize, scanAreaSize)),
-      ),
-      backgroundPaint,
-    );
+    final backgroundRect = Rect.fromLTWH(0, 0, width, height);
+    final backgroundPath = Path()
+      ..addRect(backgroundRect)
+      ..addRRect(RRect.fromRectAndRadius(cutOutRect, Radius.circular(borderRadius)))
+      ..fillType = PathFillType.evenOdd;
 
-    // Draw border
-    canvas.drawRect(
-      Rect.fromLTWH(left, top, scanAreaSize, scanAreaSize),
-      borderPaint,
-    );
+    canvas.drawPath(backgroundPath, backgroundPaint);
 
-    // Draw corner indicators
-    const double cornerLength = 20;
-    final Paint cornerPaint = Paint()
-      ..color = Colors.green
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
+    // Draw border corners
+    final borderPath = Path();
 
-    // Top-left corner
-    canvas.drawLine(
-      Offset(left, top + cornerLength),
-      Offset(left, top),
-      cornerPaint,
+    // Top left corner
+    borderPath.moveTo(cutOutRect.left, cutOutRect.top + borderLength);
+    borderPath.lineTo(cutOutRect.left, cutOutRect.top + borderRadius);
+    borderPath.arcToPoint(
+      Offset(cutOutRect.left + borderRadius, cutOutRect.top),
+      radius: Radius.circular(borderRadius),
     );
-    canvas.drawLine(
-      Offset(left, top),
-      Offset(left + cornerLength, top),
-      cornerPaint,
-    );
+    borderPath.lineTo(cutOutRect.left + borderLength, cutOutRect.top);
 
-    // Top-right corner
-    canvas.drawLine(
-      Offset(left + scanAreaSize - cornerLength, top),
-      Offset(left + scanAreaSize, top),
-      cornerPaint,
+    // Top right corner
+    borderPath.moveTo(cutOutRect.right - borderLength, cutOutRect.top);
+    borderPath.lineTo(cutOutRect.right - borderRadius, cutOutRect.top);
+    borderPath.arcToPoint(
+      Offset(cutOutRect.right, cutOutRect.top + borderRadius),
+      radius: Radius.circular(borderRadius),
     );
-    canvas.drawLine(
-      Offset(left + scanAreaSize, top),
-      Offset(left + scanAreaSize, top + cornerLength),
-      cornerPaint,
-    );
+    borderPath.lineTo(cutOutRect.right, cutOutRect.top + borderLength);
 
-    // Bottom-left corner
-    canvas.drawLine(
-      Offset(left, top + scanAreaSize - cornerLength),
-      Offset(left, top + scanAreaSize),
-      cornerPaint,
+    // Bottom right corner
+    borderPath.moveTo(cutOutRect.right, cutOutRect.bottom - borderLength);
+    borderPath.lineTo(cutOutRect.right, cutOutRect.bottom - borderRadius);
+    borderPath.arcToPoint(
+      Offset(cutOutRect.right - borderRadius, cutOutRect.bottom),
+      radius: Radius.circular(borderRadius),
     );
-    canvas.drawLine(
-      Offset(left, top + scanAreaSize),
-      Offset(left + cornerLength, top + scanAreaSize),
-      cornerPaint,
-    );
+    borderPath.lineTo(cutOutRect.right - borderLength, cutOutRect.bottom);
 
-    // Bottom-right corner
-    canvas.drawLine(
-      Offset(left + scanAreaSize - cornerLength, top + scanAreaSize),
-      Offset(left + scanAreaSize, top + scanAreaSize),
-      cornerPaint,
+    // Bottom left corner
+    borderPath.moveTo(cutOutRect.left + borderLength, cutOutRect.bottom);
+    borderPath.lineTo(cutOutRect.left + borderRadius, cutOutRect.bottom);
+    borderPath.arcToPoint(
+      Offset(cutOutRect.left, cutOutRect.bottom - borderRadius),
+      radius: Radius.circular(borderRadius),
     );
-    canvas.drawLine(
-      Offset(left + scanAreaSize, top + scanAreaSize),
-      Offset(left + scanAreaSize, top + scanAreaSize - cornerLength),
-      cornerPaint,
-    );
+    borderPath.lineTo(cutOutRect.left, cutOutRect.bottom - borderLength);
+
+    canvas.drawPath(borderPath, borderPaint);
   }
 
   @override
-  ShapeBorder scale(double t) => this;
+  ShapeBorder scale(double t) {
+    return QRScannerOverlayShape(
+      borderColor: borderColor,
+      borderWidth: borderWidth,
+      overlayColor: overlayColor,
+    );
+  }
 }
