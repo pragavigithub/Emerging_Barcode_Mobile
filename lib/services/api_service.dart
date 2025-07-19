@@ -297,12 +297,6 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> validateBarcode(String barcode) async {
-    final response = await _dio.post('/validate_barcode', data: {
-      'barcode': barcode,
-    });
-    return List<Map<String, dynamic>>.from(response.data);
-  }
 
   // Pick List APIs
   Future<List<PickList>> getPickLists({String status = 'assigned'}) async {
