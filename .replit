@@ -3,6 +3,7 @@ run = "Check The COde "
 
 [nix]
 channel = "stable-24_05"
+packages = ["flutter316"]
 
 [deployment]
 run = ["sh", "-c", "Check The COde "]
