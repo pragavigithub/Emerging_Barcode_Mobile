@@ -1,12 +1,12 @@
 modules = ["java-graalvm22.3"]
-run = "Check The COde "
+run = "flutter run"
 
 [nix]
 channel = "stable-24_05"
 packages = ["flutter316"]
 
 [deployment]
-run = ["sh", "-c", "Check The COde "]
+run = ["sh", "-c", "flutter run"]
 
 [workflows]
 runButton = "Flutter Run"
