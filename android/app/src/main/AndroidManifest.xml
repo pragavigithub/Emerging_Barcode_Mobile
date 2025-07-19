@@ -21,7 +21,6 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/LaunchTheme"
-        android:exported="true"
         android:usesCleartextTraffic="true">
         
         <activity
