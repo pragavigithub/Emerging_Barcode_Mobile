@@ -1,0 +1,66 @@
+ProcessException: Process exited abnormally with exit code 1:
+
+Welcome to Gradle 8.3!
+
+Here are the highlights of this release:
+ - Faster Java compilation
+ - Reduced memory usage
+ - Support for running on Java 20
+
+For more details see https://docs.gradle.org/8.3/release-notes.html
+
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Cannot locate tasks that match 'app:tasks' as project 'app' not found in root project 'android'.
+
+* Try:
+> Run gradlew projects to get a list of available projects.
+> For more on name expansion, please refer to https://docs.gradle.org/8.3/userguide/command_line_interface.html#sec:name_abbreviation in the Gradle documentation.
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+  Command: E:\SAP_Integ\Git Change\20250719\1\mo\2\Emerging_Barcode_Mobile\android\gradlew.bat app:tasks --all --console=auto
+PS E:\SAP_Integ\Git Change\20250719\1\mo\2\Emerging_Barcode_Mobile> flutter run
+Launching lib\main.dart on V2428 in debug mode...
+[!] Your app isn't using AndroidX.
+    To avoid potential build failures, you can quickly migrate your app by following the steps on https://goo.gl/CP92wY .
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Task 'assembleDebug' not found in root project 'android'.
+
+* Try:
+> Run gradlew tasks to get a list of available tasks.
+> For more on name expansion, please refer to https://docs.gradle.org/8.3/userguide/command_line_interface.html#sec:name_abbreviation in the Gradle documentation.
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+Running Gradle task 'assembleDebug'...                              3.3s
+ProcessException: Process exited abnormally with exit code 1:
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Cannot locate tasks that match 'app:tasks' as project 'app' not found in root project 'android'.
+
+* Try:
+> Run gradlew projects to get a list of available projects.
+> For more on name expansion, please refer to https://docs.gradle.org/8.3/userguide/command_line_interface.html#sec:name_abbreviation in the Gradle documentation.
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1s
+  Command: E:\SAP_Integ\Git Change\20250719\1\mo\2\Emerging_Barcode_Mobile\android\gradlew.bat app:tasks --all --console=auto
+PS E:\SAP_Integ\Git Change\20250719\1\mo
