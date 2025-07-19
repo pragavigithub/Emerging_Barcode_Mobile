@@ -3,13 +3,13 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 class BarcodeScannerScreen extends StatefulWidget {
   final String title;
-  final String? hint;
+  final String hint;
   final Function(String) onBarcodeDetected;
 
   const BarcodeScannerScreen({
     Key? key,
     required this.title,
-    this.hint,
+    required this.hint,
     required this.onBarcodeDetected,
   }) : super(key: key);
 
@@ -20,15 +20,11 @@ class BarcodeScannerScreen extends StatefulWidget {
 class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
   late MobileScannerController controller;
   bool isScanning = true;
-  String? lastScannedCode;
 
   @override
   void initState() {
     super.initState();
-    controller = MobileScannerController(
-      detectionSpeed: DetectionSpeed.noDuplicates,
-      facing: CameraFacing.back,
-    );
+    controller = MobileScannerController();
   }
 
   @override
@@ -37,56 +33,26 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
     super.dispose();
   }
 
-  void _onDetect(BarcodeCapture capture) {
+  void _handleBarcode(BarcodeCapture capture) {
     if (!isScanning) return;
 
     final List<Barcode> barcodes = capture.barcodes;
     if (barcodes.isNotEmpty) {
-      final String code = barcodes.first.rawValue ?? '';
-      if (code.isNotEmpty && code != lastScannedCode) {
-        lastScannedCode = code;
+      final String? code = barcodes.first.rawValue;
+      if (code != null && code.isNotEmpty) {
         setState(() {
           isScanning = false;
         });
-        
-        // Haptic feedback
-        // HapticFeedback.mediumImpact();
-        
-        // Process the scanned barcode
+
+        Navigator.pop(context);
         widget.onBarcodeDetected(code);
-        
-        // Navigate back with result
-        Navigator.of(context).pop(code);
       }
     }
-  }
-
-  void _toggleFlash() {
-    controller.toggleTorch();
-  }
-
-  void _switchCamera() {
-    controller.switchCamera();
-  }
-
-  void _manualEntry() {
-    showDialog(
-      context: context,
-      builder: (context) => _ManualEntryDialog(
-        title: widget.title,
-        onSubmit: (code) {
-          Navigator.of(context).pop();
-          widget.onBarcodeDetected(code);
-          Navigator.of(context).pop(code);
-        },
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(widget.title),
         backgroundColor: Colors.black,
@@ -94,257 +60,158 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.flash_on),
-            onPressed: _toggleFlash,
+            onPressed: () => controller.toggleTorch(),
           ),
           IconButton(
             icon: const Icon(Icons.flip_camera_ios),
-            onPressed: _switchCamera,
-          ),
-          IconButton(
-            icon: const Icon(Icons.keyboard),
-            onPressed: _manualEntry,
+            onPressed: () => controller.switchCamera(),
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Camera view
           MobileScanner(
             controller: controller,
-            onDetect: _onDetect,
+            onDetect: _handleBarcode,
           ),
-          
-          // Overlay with scanning area
-          CustomPaint(
-            painter: ScannerOverlayPainter(),
-            child: Container(),
+          Container(
+            decoration: ShapeDecoration(
+              shape: _ScannerOverlayShape(),
+            ),
           ),
-          
-          // Instructions
           Positioned(
             bottom: 100,
-            left: 20,
-            right: 20,
+            left: 0,
+            right: 0,
             child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.hint ?? 'Point camera at barcode to scan',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Tap keyboard icon for manual entry',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              child: Text(
+                widget.hint,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ),
-          
-          // Scanning status
-          if (!isScanning)
-            const Positioned(
-              top: 100,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Card(
-                  color: Colors.green,
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Barcode Scanned!',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 }
 
-class ScannerOverlayPainter extends CustomPainter {
+class _ScannerOverlayShape extends ShapeBorder {
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+  EdgeInsetsGeometry get dimensions => const EdgeInsets.all(0);
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) {
+    final double scanAreaSize = rect.width * 0.7;
+    final double left = (rect.width - scanAreaSize) / 2;
+    final double top = (rect.height - scanAreaSize) / 2;
+
+    return Path()
+      ..addRect(Rect.fromLTWH(left, top, scanAreaSize, scanAreaSize));
+  }
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
+    return Path()..addRect(rect);
+  }
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    const double scanAreaSize = 250;
+    final double left = (rect.width - scanAreaSize) / 2;
+    final double top = (rect.height - scanAreaSize) / 2;
+
+    final Paint backgroundPaint = Paint()
       ..color = Colors.black54
       ..style = PaintingStyle.fill;
 
-    final scanAreaSize = size.width * 0.7;
-    final scanAreaTop = (size.height - scanAreaSize) / 2;
-    final scanAreaLeft = (size.width - scanAreaSize) / 2;
-
-    // Draw overlay with transparent scanning area
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRect(Rect.fromLTWH(
-        scanAreaLeft,
-        scanAreaTop,
-        scanAreaSize,
-        scanAreaSize,
-      ))
-      ..fillType = PathFillType.evenOdd;
-
-    canvas.drawPath(path, paint);
-
-    // Draw scanning area border
-    final borderPaint = Paint()
-      ..color = Colors.green
+    final Paint borderPaint = Paint()
+      ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
+    // Draw overlay
+    canvas.drawPath(
+      Path.combine(
+        PathOperation.difference,
+        Path()..addRect(rect),
+        Path()..addRect(Rect.fromLTWH(left, top, scanAreaSize, scanAreaSize)),
+      ),
+      backgroundPaint,
+    );
+
+    // Draw border
     canvas.drawRect(
-      Rect.fromLTWH(scanAreaLeft, scanAreaTop, scanAreaSize, scanAreaSize),
+      Rect.fromLTWH(left, top, scanAreaSize, scanAreaSize),
       borderPaint,
     );
 
     // Draw corner indicators
-    final cornerPaint = Paint()
+    const double cornerLength = 20;
+    final Paint cornerPaint = Paint()
       ..color = Colors.green
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4;
 
-    const cornerLength = 20.0;
-
     // Top-left corner
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop),
-      Offset(scanAreaLeft + cornerLength, scanAreaTop),
+      Offset(left, top + cornerLength),
+      Offset(left, top),
       cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop),
-      Offset(scanAreaLeft, scanAreaTop + cornerLength),
+      Offset(left, top),
+      Offset(left + cornerLength, top),
       cornerPaint,
     );
 
     // Top-right corner
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop),
-      Offset(scanAreaLeft + scanAreaSize - cornerLength, scanAreaTop),
+      Offset(left + scanAreaSize - cornerLength, top),
+      Offset(left + scanAreaSize, top),
       cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + cornerLength),
+      Offset(left + scanAreaSize, top),
+      Offset(left + scanAreaSize, top + cornerLength),
       cornerPaint,
     );
 
     // Bottom-left corner
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop + scanAreaSize),
-      Offset(scanAreaLeft + cornerLength, scanAreaTop + scanAreaSize),
+      Offset(left, top + scanAreaSize - cornerLength),
+      Offset(left, top + scanAreaSize),
       cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft, scanAreaTop + scanAreaSize),
-      Offset(scanAreaLeft, scanAreaTop + scanAreaSize - cornerLength),
+      Offset(left, top + scanAreaSize),
+      Offset(left + cornerLength, top + scanAreaSize),
       cornerPaint,
     );
 
     // Bottom-right corner
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + scanAreaSize),
-      Offset(scanAreaLeft + scanAreaSize - cornerLength, scanAreaTop + scanAreaSize),
+      Offset(left + scanAreaSize - cornerLength, top + scanAreaSize),
+      Offset(left + scanAreaSize, top + scanAreaSize),
       cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + scanAreaSize),
-      Offset(scanAreaLeft + scanAreaSize, scanAreaTop + scanAreaSize - cornerLength),
+      Offset(left + scanAreaSize, top + scanAreaSize),
+      Offset(left + scanAreaSize, top + scanAreaSize - cornerLength),
       cornerPaint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _ManualEntryDialog extends StatefulWidget {
-  final String title;
-  final Function(String) onSubmit;
-
-  const _ManualEntryDialog({
-    required this.title,
-    required this.onSubmit,
-  });
-
-  @override
-  State<_ManualEntryDialog> createState() => _ManualEntryDialogState();
-}
-
-class _ManualEntryDialogState extends State<_ManualEntryDialog> {
-  final _controller = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Enter ${widget.title}'),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: widget.title,
-            hintText: 'Enter manually or scan',
-            border: const OutlineInputBorder(),
-          ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter a valid code';
-            }
-            return null;
-          },
-          onFieldSubmitted: (value) {
-            if (_formKey.currentState?.validate() == true) {
-              widget.onSubmit(value.trim());
-            }
-          },
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState?.validate() == true) {
-              widget.onSubmit(_controller.text.trim());
-            }
-          },
-          child: const Text('Submit'),
-        ),
-      ],
-    );
-  }
+  ShapeBorder scale(double t) => this;
 }

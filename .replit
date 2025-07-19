@@ -6,3 +6,19 @@ channel = "stable-24_05"
 
 [deployment]
 run = ["sh", "-c", "Check The COde "]
+
+[workflows]
+runButton = "Flutter Run"
+
+[[workflows.workflow]]
+name = "Flutter Run"
+author = 45228374
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flutter pub get"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flutter run --web-port=5000 --web-hostname=0.0.0.0"

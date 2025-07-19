@@ -7,16 +7,147 @@ import '../models/inventory_transfer.dart';
 import '../models/grpo_document.dart';
 
 class DatabaseService {
-  static Database? _database;
-  static const String _databaseName = 'wms_mobile.db';
-  static const int _databaseVersion = 1;
+  Database? _database;
 
   Future<Database> get database async {
-    _database ??= await _initDatabase();
+    if (_database != null) return _database!;
+    _database = await initDatabase();
     return _database!;
   }
 
-  Future<void> initDatabase() async {
+  Future<Database> initDatabase() async {
+    final databasesPath = await getDatabasesPath();
+    final path = join(databasesPath, 'wms_mobile.db');
+
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _onCreate,
+    );
+  }
+
+  Future<void> _onCreate(Database db, int version) async {
+    // Create users table
+    await db.execute('''
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        username TEXT NOT NULL,
+        email TEXT NOT NULL,
+        role TEXT NOT NULL,
+        full_name TEXT,
+        branch_code TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Create inventory_transfers table
+    await db.execute('''
+      CREATE TABLE inventory_transfers (
+        id INTEGER PRIMARY KEY,
+        reference_number TEXT NOT NULL,
+        from_location TEXT NOT NULL,
+        to_location TEXT NOT NULL,
+        status TEXT NOT NULL,
+        notes TEXT,
+        user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Create grpo_documents table
+    await db.execute('''
+      CREATE TABLE grpo_documents (
+        id INTEGER PRIMARY KEY,
+        document_number TEXT NOT NULL,
+        vendor_name TEXT NOT NULL,
+        status TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // User methods
+  Future<void> insertUser(User user) async {
+    final db = await database;
+    await db.insert(
+      'users',
+      user.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<User?> getUser(int id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return User.fromJson(maps.first);
+    }
+    return null;
+  }
+
+  // Inventory Transfer methods
+  Future<void> insertOrUpdateInventoryTransfer(InventoryTransfer transfer) async {
+    final db = await database;
+    await db.insert(
+      'inventory_transfers',
+      transfer.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<InventoryTransfer>> getInventoryTransfers() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('inventory_transfers');
+    return List.generate(maps.length, (i) {
+      return InventoryTransfer.fromJson(maps[i]);
+    });
+  }
+
+  // GRPO Document methods
+  Future<void> insertOrUpdateGRPODocument(GRPODocument grpo) async {
+    final db = await database;
+    await db.insert(
+      'grpo_documents',
+      grpo.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<GRPODocument>> getGRPODocuments() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('grpo_documents');
+    return List.generate(maps.length, (i) {
+      return GRPODocument.fromJson(maps[i]);
+    });
+  }
+
+  Future<void> close() async {
+    final db = _database;
+    if (db != null) {
+      await db.close();
+    }
+  }
+  static const String _databaseName = 'wms_mobile.db';
+  static const int _databaseVersion = 1;
+
+  
+
+  
+
+  
+
+  Future<void> initDatabase1() async {
     if (_database == null) {
       await database;
     }
@@ -25,18 +156,18 @@ class DatabaseService {
   Future<Database> _initDatabase() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = join(documentsDirectory.path, _databaseName);
-    
+
     return await openDatabase(
       path,
       version: _databaseVersion,
-      onCreate: _onCreate,
+      onCreate: _onCreate1,
       onUpgrade: _onUpgrade,
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
+  Future<void> _onCreate1(Database db, int version) async {
     print('📱 Creating local database tables...');
-    
+
     // Users table
     await db.execute('''
       CREATE TABLE users (
@@ -187,7 +318,7 @@ class DatabaseService {
   }
 
   // User operations
-  Future<int> insertUser(User user) async {
+  Future<int> insertUser1(User user) async {
     final db = await database;
     return await db.insert(
       'users',
@@ -196,7 +327,7 @@ class DatabaseService {
     );
   }
 
-  Future<User?> getUser(int id) async {
+  Future<User?> getUser1(int id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'users',
@@ -217,7 +348,7 @@ class DatabaseService {
   }
 
   // Inventory Transfer operations
-  Future<int> insertInventoryTransfer(InventoryTransfer transfer) async {
+  Future<int> insertInventoryTransfer1(InventoryTransfer transfer) async {
     final db = await database;
     return await db.insert(
       'inventory_transfers',
@@ -226,7 +357,7 @@ class DatabaseService {
     );
   }
 
-  Future<List<InventoryTransfer>> getAllInventoryTransfers() async {
+  Future<List<InventoryTransfer>> getAllInventoryTransfers1() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'inventory_transfers',
@@ -235,7 +366,7 @@ class DatabaseService {
     return List.generate(maps.length, (i) => _transferFromMap(maps[i]));
   }
 
-  Future<InventoryTransfer?> getInventoryTransfer(int id) async {
+  Future<InventoryTransfer?> getInventoryTransfer1(int id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'inventory_transfers',
@@ -260,7 +391,7 @@ class DatabaseService {
     return List.generate(maps.length, (i) => _transferFromMap(maps[i]));
   }
 
-  Future<int> updateInventoryTransfer(InventoryTransfer transfer) async {
+  Future<int> updateInventoryTransfer1(InventoryTransfer transfer) async {
     final db = await database;
     return await db.update(
       'inventory_transfers',
@@ -270,7 +401,7 @@ class DatabaseService {
     );
   }
 
-  Future<int> deleteInventoryTransfer(int id) async {
+  Future<int> deleteInventoryTransfer1(int id) async {
     final db = await database;
     return await db.delete(
       'inventory_transfers',
@@ -280,7 +411,7 @@ class DatabaseService {
   }
 
   // GRPO Document operations
-  Future<int> insertGRPODocument(GRPODocument grpo) async {
+  Future<int> insertGRPODocument1(GRPODocument grpo) async {
     final db = await database;
     return await db.insert(
       'grpo_documents',
@@ -289,7 +420,7 @@ class DatabaseService {
     );
   }
 
-  Future<List<GRPODocument>> getAllGRPODocuments() async {
+  Future<List<GRPODocument>> getAllGRPODocuments1() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'grpo_documents',
@@ -298,7 +429,7 @@ class DatabaseService {
     return List.generate(maps.length, (i) => _grpoFromMap(maps[i]));
   }
 
-  Future<GRPODocument?> getGRPODocument(int id) async {
+  Future<GRPODocument?> getGRPODocument1(int id) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'grpo_documents',
