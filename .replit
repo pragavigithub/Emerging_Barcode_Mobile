@@ -18,8 +18,12 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
+args = "flutter clean"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
 args = "flutter pub get"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "flutter run --web-port=5000 --web-hostname=0.0.0.0"
+args = "flutter run --debug"
